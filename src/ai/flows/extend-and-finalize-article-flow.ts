@@ -34,9 +34,9 @@ const prompt = ai.definePrompt({
   output: {schema: ExtendAndFinalizeArticleOutputSchema},
   prompt: `You are an expert research writer and editor. You will perform a multi-step task:
 First, you will extend an existing article draft.
-Second, you will create a consolidated "References" section for the complete, combined article.
+Second, you will create a consolidated and exhaustive "References" section for the complete, combined article.
 
-The original topic is: "{{user_topic}}"
+The original topic is: "{{userTopic}}"
 The desired tone is: "{{tone}}"
 The desired output format is: "{{format}}"
 
@@ -47,21 +47,21 @@ Here is the initial article content you need to extend:
 
 **Part 1: Extend Article Content**
 1.  Review the 'initialArticleContent' provided above.
-2.  Generate approximately 2000-3000 additional words of NEW, relevant content. This new content MUST strictly stay on the original topic: "{{user_topic}}" and maintain the "{{tone}}" tone.
+2.  Generate approximately 2000-3000 additional words of NEW, relevant content. This new content MUST strictly stay on the original topic: "{{userTopic}}" and maintain the "{{tone}}" tone.
 3.  DO NOT repeat information already present in the 'initialArticleContent'. Focus on adding new depth, exploring new sub-topics, or providing further details on aspects briefly mentioned.
 4.  Organize your new, additional content logically into sections and subsections using H2 and H3 headings as appropriate for the "{{format}}" output.
 5.  After every major new section you add, you MUST include 1-2 real, relevant links from reputable sources (e.g., Wikipedia, Forbes, Scientific American, Harvard.edu, etc.). These links should be directly related to the content of that new section and formatted as clickable links appropriate for the "{{format}}".
 6.  Let's call the content generated in this Part 1 "extendedContent".
 
-**Part 2: Combine and Add References Section**
+**Part 2: Combine and Create Exhaustive References Section**
 1.  Take the 'initialArticleContent' and append your newly generated 'extendedContent' to it. This forms the "completeArticleBody".
-2.  Now, for this "completeArticleBody", create a "References" section that will be placed at the VERY END.
+2.  Now, for this "completeArticleBody", create an exhaustive "References" section that will be placed at the VERY END. This section should be as comprehensive as possible, listing as many relevant references as you can find.
 3.  The "References" section must follow these rules:
     a.  **Heading**: Start with a heading. If format is Markdown, use "## References". If format is "Plain Text", use "References:".
-    b.  **Extract Links**: Identify and extract ALL unique URLs that are embedded as in-text links throughout the "completeArticleBody" (both initial and extended parts).
-    c.  **List URLs**: List each unique URL. Each URL should be on a new line. Format them as clickable links if the "{{format}}" supports it (e.g., in Markdown, use <http://example.com> or [http://example.com](http://example.com)).
-    d.  **Annotate Links**: For each URL or group of related URLs, if identifiable from the URL or common knowledge, briefly mention the names of key authors or organizations associated with that source.
-    e.  **Mention Key Individuals**: In addition to link annotations, or as part of them, identify and list names of important individuals who have published significant work or are key figures related to the overall article topic "{{userTopic}}". Briefly explain their connection or contribution to the topic. This information might not come directly from the links but from your general knowledge about the topic.
+    b.  **Extract and List All Linked URLs**: Identify and extract ALL unique URLs that are embedded as in-text links throughout the "completeArticleBody" (both initial and extended parts). List each unique URL. Each URL should be on a new line. Format them as clickable links if the "{{format}}" supports it.
+    c.  **Identify Key Authors and Publications from Links**: For each extracted URL or group of related URLs, if identifiable from the URL or common knowledge, briefly mention the names of key authors or organizations associated with that source. If specific publication titles related to the URL are known, mention them.
+    d.  **Identify Key Individuals, Their Publications, and Contributions (Broader Scope)**: Beyond the direct links, use your extensive knowledge of the topic "{{userTopic}}" to identify and list the most important individuals ("most peoples who worked in this particular topic") who have worked on or published significant material related to this topic. For each individual, list their key publications (including specific titles if known) or contributions, even if these specific works were not directly linked in the article body. Explain their significance and relevance to the topic "{{userTopic}}". Aim to cover a broad range of influential figures and their works.
+    e.  **Structure**: Organize this information clearly. You might group by individual, by linked source, or by publication type, then expand with related publications and author details. Ensure the section is well-structured and easy to read.
 
 Your final output for 'finalFullArticle' must be a single string containing:
 initialArticleContent
