@@ -33,7 +33,7 @@ const prompt = ai.definePrompt({
   name: 'generateArticlePrompt',
   input: {schema: GenerateArticleInputSchema},
   output: {schema: GenerateArticleOutputSchema},
-  prompt: `You are an expert research writer. Your task is to generate a comprehensive and highly detailed article of AT LEAST 6000 words, strictly focused on the topic: "{{user_topic}}".
+  prompt: `You are an expert research writer. Your task is to generate a comprehensive and highly detailed article of AT LEAST 4000 words, strictly focused on the topic: "{{user_topic}}".
 
 Follow these instructions carefully:
 1.  **Content Focus**: The entire article must be dedicated to the specified "{{user_topic}}". Do not deviate to other topics.
