@@ -6,20 +6,21 @@ import type { TopicFormValues } from "./TopicForm";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Link as LinkIcon } from "lucide-react"; // Renamed to avoid conflict with potential Link component from Next.js
+import { Link as LinkIcon } from "lucide-react"; 
+import type React from 'react';
 
 interface ArticleDisplayProps {
   articleContent: string;
   format: TopicFormValues['format'];
   title?: string;
+  contentRef?: React.RefObject<HTMLDivElement>; // Added ref for PDF generation
 }
 
-export function ArticleDisplay({ articleContent, format, title = "Generated Article" }: ArticleDisplayProps) {
+export function ArticleDisplay({ articleContent, format, title = "Generated Article", contentRef }: ArticleDisplayProps) {
 
   const customMarkdownComponents = {
     a: ({node, children, href, ...props}: {node: any, children: React.ReactNode, href?: string, [key: string]: any}) => {
       if (!href) {
-        // Render children as is or a span if href is missing
         return <span {...props}>{children}</span>;
       }
       return (
@@ -31,8 +32,8 @@ export function ArticleDisplay({ articleContent, format, title = "Generated Arti
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center align-middle mx-1 text-primary hover:text-primary/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
-                title={href} // Provides a native tooltip as a fallback and for accessibility
-                {...props} // Spread remaining props, but href is handled
+                title={href} 
+                {...props} 
               >
                 <LinkIcon className="h-4 w-4" />
               </a>
@@ -44,8 +45,6 @@ export function ArticleDisplay({ articleContent, format, title = "Generated Arti
         </TooltipProvider>
       );
     },
-    // You can add more custom renderers here for other elements if needed
-    // e.g. p: ({node, ...props}) => <p className="mb-4" {...props} />,
   };
 
   const renderContent = () => {
@@ -62,15 +61,24 @@ export function ArticleDisplay({ articleContent, format, title = "Generated Arti
       );
     }
     if (format === "PDF") {
+        // For PDF format, the content is still textual. 
+        // The actual PDF generation happens via download button using the rendered output.
+        // Display it as Markdown or preformatted text based on its likely nature.
+        // Assuming PDF format prompt to LLM might result in Markdown-like text.
         return (
-            <div>
-                <p className="mb-4 text-muted-foreground">PDF output format is experimental. The content below is the textual representation. For actual PDF download, use the download button if available for PDF format.</p>
-                <pre className="whitespace-pre-wrap p-4 bg-muted rounded-md text-sm">{articleContent}</pre>
+             <div className="prose dark:prose-invert max-w-none article-content">
+                <p className="mb-4 text-muted-foreground">Below is the textual representation. Use the 'Download Article' button to get the PDF.</p>
+                <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={customMarkdownComponents}
+                >
+                    {articleContent}
+                </ReactMarkdown>
             </div>
         )
     }
     // Plain Text
-    return <pre className="whitespace-pre-wrap p-4 bg-muted rounded-md text-sm">{articleContent}</pre>;
+    return <pre className="whitespace-pre-wrap p-4 bg-muted rounded-md text-sm article-content">{articleContent}</pre>;
   };
 
   return (
@@ -78,7 +86,7 @@ export function ArticleDisplay({ articleContent, format, title = "Generated Arti
       <CardHeader>
         <CardTitle className="font-headline text-3xl text-primary">{title}</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent ref={contentRef}> {/* Attach the ref here */}
         {renderContent()}
       </CardContent>
     </Card>

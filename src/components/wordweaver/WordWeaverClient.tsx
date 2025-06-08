@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useTransition } from 'react';
+import React, { useState, useTransition, useRef } from 'react';
 import { TopicForm, type TopicFormValues } from './TopicForm';
 import { LoadingState } from './LoadingState';
 import { ArticleDisplay } from './ArticleDisplay';
@@ -18,6 +18,7 @@ export function WordWeaverClient() {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
+  const articleContentRef = useRef<HTMLDivElement>(null);
 
   const handleFormSubmit = async (values: TopicFormValues) => {
     setFormValues(values);
@@ -80,11 +81,13 @@ export function WordWeaverClient() {
               articleContent={articleOutput.articleContent}
               format={formValues.format}
               title={`Article on: ${formValues.user_topic}`}
+              contentRef={articleContentRef}
             />
             <ArticleActions
               articleContent={articleOutput.articleContent}
               articleTopic={formValues.user_topic}
               articleFormat={formValues.format}
+              contentRef={articleContentRef}
             />
              <div className="mt-8 text-center">
                 <button 

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { downloadTextFile } from '@/lib/download';
 import { summarizeContent, type SummarizeContentOutput } from '@/ai/flows/summarize-content';
@@ -11,18 +12,24 @@ import { generateSeoMetadata, type GenerateSeoMetadataOutput } from '@/ai/flows/
 import { Loader2, ClipboardCopy, Download, BookOpen, SearchCheck, ThumbsUp } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import type { TopicFormValues } from './TopicForm';
+import jsPDF from 'jspdf';
+// html2canvas is imported by jsPDF.html method if available, ensure it's installed.
+// dompurify is also used by jsPDF.html method if available, ensure it's installed.
+
 
 interface ArticleActionsProps {
   articleContent: string;
   articleTopic: string;
   articleFormat: TopicFormValues['format'];
+  contentRef: React.RefObject<HTMLDivElement>; // Ref to the article content display element
 }
 
-export function ArticleActions({ articleContent, articleTopic, articleFormat }: ArticleActionsProps) {
+export function ArticleActions({ articleContent, articleTopic, articleFormat, contentRef }: ArticleActionsProps) {
   const [summary, setSummary] = useState<SummarizeContentOutput | null>(null);
   const [seoMeta, setSeoMeta] = useState<GenerateSeoMetadataOutput | null>(null);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [isGeneratingSeo, setIsGeneratingSeo] = useState(false);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const { toast } = useToast();
 
   const handleCopy = () => {
@@ -33,18 +40,53 @@ export function ArticleActions({ articleContent, articleTopic, articleFormat }: 
 
   const handleDownload = () => {
     let filename = `${articleTopic.replace(/\s+/g, '_').toLowerCase()}`;
-    let mimeType = 'text/plain;charset=utf-8';
 
+    if (articleFormat === 'PDF') {
+      filename += '.pdf';
+      if (contentRef.current) {
+        setIsDownloadingPdf(true);
+        toast({ title: "Info", description: "Generating PDF, this may take a moment..." });
+        
+        const pdf = new jsPDF('p', 'pt', 'a4');
+        // Access the first child of CardContent as the source for pdf.html
+        // to avoid capturing the CardContent padding if any, and focus on the rendered article.
+        const sourceElement = contentRef.current.firstChild as HTMLElement || contentRef.current;
+
+        pdf.html(sourceElement, {
+          callback: function (doc) {
+            doc.save(filename);
+            toast({ title: "Success", description: `Article downloaded as ${filename}` });
+            setIsDownloadingPdf(false);
+          },
+          error: function (err) {
+            console.error("jsPDF html error:", err);
+            toast({ variant: "destructive", title: "PDF Generation Error", description: "Failed to generate PDF. Check console for details." });
+            setIsDownloadingPdf(false);
+          },
+          margin: [40, 40, 40, 40], // top, right, bottom, left in points
+          autoPaging: 'text', // 'text' tries to avoid cutting text lines, 'slice' is simpler
+          html2canvas: {
+            scale: 0.60, // Adjust scale to fit content better. Lower scale means smaller content on PDF.
+            useCORS: true, // Important if your content includes images from other domains
+            logging: false, // Disable html2canvas logging in console
+             // Ensure there's a background color if the source element doesn't have one explicitly (e.g., for dark mode capture)
+            backgroundColor: window.getComputedStyle(sourceElement).backgroundColor,
+          },
+          // width: pdf.internal.pageSize.getWidth() - 80, // You can set explicit width
+          // windowWidth: sourceElement.scrollWidth, // Use element's scroll width
+        });
+      } else {
+        toast({ variant: "destructive", title: "Error", description: "Article content element not found for PDF generation." });
+      }
+      return; // Prevent fallback to other download types
+    }
+
+    // Original download logic for Markdown and Plain Text
+    let mimeType = 'text/plain;charset=utf-8';
     if (articleFormat === 'Markdown') {
       filename += '.md';
       mimeType = 'text/markdown;charset=utf-8';
-    } else if (articleFormat === 'PDF') {
-      // This assumes AI generated PDF content directly, or gives a link.
-      // For now, it will download the text content as .txt if it's not a direct PDF output.
-      // If AI can give actual PDF bytes, this needs adjustment.
-      filename += '_content.txt'; // Fallback if direct PDF output is not handled
-      toast({ title: "Info", description: "PDF download is experimental. Downloading textual content as .txt." });
-    } else {
+    } else { // Plain Text
       filename += '.txt';
     }
     downloadTextFile(articleContent, filename, mimeType);
@@ -90,14 +132,15 @@ export function ArticleActions({ articleContent, articleTopic, articleFormat }: 
           <Button onClick={handleCopy} variant="outline">
             <ClipboardCopy className="mr-2 h-4 w-4" /> Copy Content
           </Button>
-          <Button onClick={handleDownload} variant="outline">
-            <Download className="mr-2 h-4 w-4" /> Download Article
+          <Button onClick={handleDownload} variant="outline" disabled={isDownloadingPdf}>
+            {isDownloadingPdf ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+            {isDownloadingPdf ? "Downloading PDF..." : "Download Article"}
           </Button>
-          <Button onClick={handleSummarize} disabled={isSummarizing} variant="outline">
+          <Button onClick={handleSummarize} disabled={isSummarizing || isDownloadingPdf} variant="outline">
             {isSummarizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BookOpen className="mr-2 h-4 w-4" />}
             {isSummarizing ? "Summarizing..." : "Summarize (500 words)"}
           </Button>
-          <Button onClick={handleGenerateSeo} disabled={isGeneratingSeo} variant="outline">
+          <Button onClick={handleGenerateSeo} disabled={isGeneratingSeo || isDownloadingPdf} variant="outline">
             {isGeneratingSeo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <SearchCheck className="mr-2 h-4 w-4" />}
             {isGeneratingSeo ? "Generating..." : "Generate SEO Meta"}
           </Button>
@@ -120,11 +163,11 @@ export function ArticleActions({ articleContent, articleTopic, articleFormat }: 
             <div className="space-y-4">
               <h3 className="text-xl font-headline font-semibold">SEO Metadata</h3>
               <div>
-                <label htmlFor="seoTitle" className="block text-sm font-medium text-muted-foreground mb-1">SEO Title</label>
+                <Label htmlFor="seoTitle" className="block text-sm font-medium text-muted-foreground mb-1">SEO Title</Label>
                 <Input id="seoTitle" value={seoMeta.seoTitle} readOnly className="bg-muted" />
               </div>
               <div>
-                <label htmlFor="metaDescription" className="block text-sm font-medium text-muted-foreground mb-1">Meta Description</label>
+                <Label htmlFor="metaDescription" className="block text-sm font-medium text-muted-foreground mb-1">Meta Description</Label>
                 <Textarea id="metaDescription" value={seoMeta.metaDescription} readOnly rows={3} className="bg-muted" />
               </div>
             </div>
