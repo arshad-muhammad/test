@@ -6,7 +6,7 @@ import type { TopicFormValues } from "./TopicForm";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Link as LinkIcon } from "lucide-react"; 
+// LinkIcon import is no longer needed
 import type React from 'react';
 
 interface ArticleDisplayProps {
@@ -17,12 +17,18 @@ interface ArticleDisplayProps {
 }
 
 export function ArticleDisplay({ articleContent, format, title = "Generated Article", contentRef }: ArticleDisplayProps) {
+  let linkCounter = 0; // Counter for numbered references, reset on each render
 
   const customMarkdownComponents = {
     a: ({node, children, href, ...props}: {node: any, children: React.ReactNode, href?: string, [key: string]: any}) => {
       if (!href) {
+        // Handle cases where 'a' tag might not be a typical link (e.g. anchor links)
+        // or if children exist, render them. For now, render as simple span.
         return <span {...props}>{children}</span>;
       }
+      linkCounter++;
+      const currentLinkNumber = linkCounter;
+
       return (
         <TooltipProvider>
           <Tooltip>
@@ -31,15 +37,15 @@ export function ArticleDisplay({ articleContent, format, title = "Generated Arti
                 href={href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center align-middle mx-1 text-primary hover:text-primary/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
-                title={href} 
-                {...props} 
+                className="mx-0.5 px-1 py-0.5 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 rounded-sm focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                title={`Link ${currentLinkNumber}: ${href}`} // Standard browser tooltip as fallback/enhancement
+                {...props} // Spread other props like `key` if ReactMarkdown passes them
               >
-                <LinkIcon className="h-4 w-4" />
+                [{currentLinkNumber}] {/* Display numbered reference */}
               </a>
             </TooltipTrigger>
-            <TooltipContent>
-              <p>{href}</p>
+            <TooltipContent side="top" className="max-w-xs break-all">
+              <p>{href}</p> {/* ShadCN Tooltip shows the URL */}
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -48,9 +54,15 @@ export function ArticleDisplay({ articleContent, format, title = "Generated Arti
   };
 
   const renderContent = () => {
-    if (format === "Markdown") {
+    linkCounter = 0; // Ensure counter is reset before rendering Markdown
+    if (format === "Markdown" || format === "PDF") { // Treat PDF textual content as Markdown for display
       return (
         <div className="prose dark:prose-invert max-w-none article-content">
+          {format === "PDF" && (
+            <p className="mb-4 text-sm text-muted-foreground italic">
+              Textual representation for PDF. Use 'Download Article' for the actual PDF file.
+            </p>
+          )}
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             components={customMarkdownComponents}
@@ -59,23 +71,6 @@ export function ArticleDisplay({ articleContent, format, title = "Generated Arti
           </ReactMarkdown>
         </div>
       );
-    }
-    if (format === "PDF") {
-        // For PDF format, the content is still textual. 
-        // The actual PDF generation happens via download button using the rendered output.
-        // Display it as Markdown or preformatted text based on its likely nature.
-        // Assuming PDF format prompt to LLM might result in Markdown-like text.
-        return (
-             <div className="prose dark:prose-invert max-w-none article-content">
-                <p className="mb-4 text-muted-foreground">Below is the textual representation. Use the 'Download Article' button to get the PDF.</p>
-                <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    components={customMarkdownComponents}
-                >
-                    {articleContent}
-                </ReactMarkdown>
-            </div>
-        )
     }
     // Plain Text
     return <pre className="whitespace-pre-wrap p-4 bg-muted rounded-md text-sm article-content">{articleContent}</pre>;
