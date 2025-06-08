@@ -16,12 +16,12 @@ import {z} from 'genkit';
 const GenerateArticleInputSchema = z.object({
   user_topic: z.string().describe('The topic for the article.'),
   tone: z.enum(['Academic', 'Blog', 'Creative']).default('Blog').describe('The tone of the article.'),
-  format: z.enum(['Plain Text', 'Markdown', 'PDF']).default('Markdown').describe('The output format for the article.'),
+  format: z.enum(['Plain Text', 'Markdown', 'PDF']).default('Markdown').describe('The output format for the article (influences link formatting).'),
 });
 export type GenerateArticleInput = z.infer<typeof GenerateArticleInputSchema>;
 
 const GenerateArticleOutputSchema = z.object({
-  articleContent: z.string().describe('The generated article content, including a References section at the end.'),
+  articleContent: z.string().describe('The generated article content, including in-text links. This version does NOT include a final "References" section.'),
 });
 export type GenerateArticleOutput = z.infer<typeof GenerateArticleOutputSchema>;
 
@@ -40,13 +40,10 @@ Follow these instructions carefully:
 2.  **Structure**: Organize the article logically into sections and subsections using H2 and H3 headings as appropriate for the "{{format}}" output.
 3.  **In-text Links**: After every major section of the article, you MUST include 1-2 real, relevant links from reputable sources (e.g., Wikipedia, Forbes, Scientific American, Harvard.edu, etc.). These links should be directly related to the content of that section and formatted as clickable links appropriate for the "{{format}}".
 4.  **Tone**: Maintain a "{{tone}}" tone throughout the article.
-5.  **References Section**: At the VERY END of the entire article content, after all sections and their respective in-text links, you MUST add a final section. This section should start with a heading like "## References" (if format is Markdown; use an equivalent plain text heading if format is "Plain Text" e.g., "References:"). This section should contain:
-    *   A list of ALL the unique URLs that you embedded as in-text links throughout the article. Each URL should be on a new line and formatted as a clickable link if the "{{format}}" supports it (e.g., in Markdown, use <http://example.com> or [http://example.com](http://example.com)).
-    *   For each URL or group of related URLs, if identifiable, mention the names of key authors or organizations.
-    *   Additionally, or as part of the URL annotations, include names of important individuals who have published significant work or are key figures related to the overall article topic "{{user_topic}}". Briefly explain their connection or contribution.
-6.  **Output Format**: The final output, including all sections, in-text links, and the final "References" section, should be in "{{format}}".
+5.  **Output Format**: The article content should be suitable for "{{format}}".
+6.  **NO FINAL REFERENCES SECTION**: Your output for 'articleContent' should ONLY be the body of the article with its in-text links. Do NOT add a "References" section at the end of this part. Another process will handle the final consolidated references.
 
-The generated 'articleContent' must contain the full article including this final "References" section.`,
+The generated 'articleContent' must contain the article body and its in-text links as described.`,
 });
 
 const generateArticleFlow = ai.defineFlow(
@@ -60,4 +57,3 @@ const generateArticleFlow = ai.defineFlow(
     return output!;
   }
 );
-

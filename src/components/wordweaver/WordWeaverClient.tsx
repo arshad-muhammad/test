@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useTransition, useRef } from 'react';
@@ -5,7 +6,8 @@ import { TopicForm, type TopicFormValues } from './TopicForm';
 import { LoadingState } from './LoadingState';
 import { ArticleDisplay } from './ArticleDisplay';
 import { ArticleActions } from './ArticleActions';
-import { generateArticle, type GenerateArticleOutput } from '@/ai/flows/generate-article';
+import { generateArticle, type GenerateArticleOutput as InitialArticleOutput } from '@/ai/flows/generate-article';
+import { extendAndFinalizeArticle, type ExtendAndFinalizeArticleOutput } from '@/ai/flows/extend-and-finalize-article-flow';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Terminal } from "lucide-react";
 import { BrandIcon } from '@/components/icons/BrandIcon';
@@ -13,7 +15,8 @@ import { useToast } from "@/hooks/use-toast";
 
 export function WordWeaverClient() {
   const [isLoading, setIsLoading] = useState(false);
-  const [articleOutput, setArticleOutput] = useState<GenerateArticleOutput | null>(null);
+  const [loadingMessage, setLoadingMessage] = useState("Generating your article, please wait...");
+  const [finalArticle, setFinalArticle] = useState<string | null>(null);
   const [formValues, setFormValues] = useState<TopicFormValues | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -23,25 +26,37 @@ export function WordWeaverClient() {
   const handleFormSubmit = async (values: TopicFormValues) => {
     setFormValues(values);
     setError(null);
-    setArticleOutput(null); // Clear previous article
+    setFinalArticle(null); 
     
     startTransition(async () => {
       setIsLoading(true);
       try {
-        const result = await generateArticle({
+        setLoadingMessage("Generating initial draft (approx. 4000 words)...");
+        const initialResult: InitialArticleOutput = await generateArticle({
           user_topic: values.user_topic,
           tone: values.tone,
           format: values.format,
         });
-        setArticleOutput(result);
+
+        setLoadingMessage("Extending content and finalizing references (approx. 2000-3000 more words)...");
+        const finalResult: ExtendAndFinalizeArticleOutput = await extendAndFinalizeArticle({
+          initialArticleContent: initialResult.articleContent,
+          userTopic: values.user_topic,
+          tone: values.tone,
+          format: values.format,
+        });
+        
+        setFinalArticle(finalResult.finalFullArticle);
         toast({ title: "Article Generated!", description: "Your masterpiece is ready.", duration: 5000 });
+
       } catch (err) {
-        console.error("Article generation error:", err);
+        console.error("Article generation process error:", err);
         const errorMessage = err instanceof Error ? err.message : "An unknown error occurred during article generation.";
         setError(errorMessage);
         toast({ variant: "destructive", title: "Generation Failed", description: errorMessage, duration: 8000 });
       } finally {
         setIsLoading(false);
+        setLoadingMessage("Generating your article, please wait..."); // Reset message
       }
     });
   };
@@ -61,11 +76,11 @@ export function WordWeaverClient() {
       </header>
 
       <main>
-        {!articleOutput && !isLoading && (
+        {!finalArticle && !isLoading && (
             <TopicForm onSubmit={handleFormSubmit} isSubmitting={isLoading || isPending} />
         )}
         
-        {(isLoading || isPending) && <LoadingState />}
+        {(isLoading || isPending) && <LoadingState message={loadingMessage} />}
 
         {error && !isLoading && (
           <Alert variant="destructive" className="my-8">
@@ -75,16 +90,16 @@ export function WordWeaverClient() {
           </Alert>
         )}
 
-        {articleOutput && formValues && !isLoading && (
+        {finalArticle && formValues && !isLoading && (
           <>
             <ArticleDisplay
-              articleContent={articleOutput.articleContent}
+              articleContent={finalArticle}
               format={formValues.format}
               title={`Article on: ${formValues.user_topic}`}
               contentRef={articleContentRef}
             />
             <ArticleActions
-              articleContent={articleOutput.articleContent}
+              articleContent={finalArticle}
               articleTopic={formValues.user_topic}
               articleFormat={formValues.format}
               contentRef={articleContentRef}
@@ -92,7 +107,7 @@ export function WordWeaverClient() {
              <div className="mt-8 text-center">
                 <button 
                     onClick={() => {
-                        setArticleOutput(null);
+                        setFinalArticle(null);
                         setError(null);
                         setFormValues(null);
                     }}
