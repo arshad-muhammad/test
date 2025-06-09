@@ -24,9 +24,11 @@ export default function PlagiarismAnalyzerPage() {
 
   useEffect(() => {
     setCurrentYear(new Date().getFullYear());
-    // Set the workerSrc for pdfjs-dist
+    // Set the workerSrc for pdfjs-dist to the ES Module version
     // Using a CDN for simplicity. For production, consider hosting it locally or bundling.
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+    if (typeof window !== 'undefined') { // Ensure this only runs in the browser
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+    }
   }, []);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -58,29 +60,28 @@ export default function PlagiarismAnalyzerPage() {
           const page = await pdfDocument.getPage(i);
           const textContent = await page.getTextContent();
           const pageText = textContent.items
-            .filter((item: any) => item && typeof item.str === 'string') // Ensure item exists and item.str is a string
+            .filter((item: any): item is { str: string } => item && typeof item.str === 'string') 
             .map((item: any) => item.str)
-            .join(' '); // Join text pieces with a space
-          fullText += pageText + '\n'; // Add page text and a newline
+            .join(' '); 
+          fullText += pageText + '\n'; 
         }
-        setInputText(fullText.trim()); // Trim trailing newline and any other whitespace
+        setInputText(fullText.trim()); 
       } else {
         setError('Unsupported file type. Please upload a .txt, .docx, or .pdf file.');
-        setSelectedFile(null); // Clear unsupported file
+        setSelectedFile(null); 
       }
     } catch (e) {
-      console.error('Error processing file:', e); // Log the actual error for dev console
+      console.error('Error processing file:', e); 
       let errorMessage = 'Could not read file content. Please ensure it is a valid .txt, .docx, or .pdf file and not corrupted.';
       if (e instanceof Error) {
-        // Provide a more specific message if possible, but keep it user-friendly and concise
         const messageSnippet = e.message.substring(0, 100);
         errorMessage = `Failed to process file: ${messageSnippet}${e.message.length > 100 ? '...' : ''}. Please check the file.`;
       }
       setError(errorMessage);
-      setSelectedFile(null); // Clear file on error
+      setSelectedFile(null); 
     } finally {
       setIsProcessingFile(false);
-      // Clear the file input so the same file can be re-uploaded if needed
+      
       if (event.target) {
         event.target.value = '';
       }
@@ -95,12 +96,12 @@ export default function PlagiarismAnalyzerPage() {
   };
 
   const handleSubmit = async () => {
-    if (!inputText.trim() && !selectedFile) { // Check inputText as well, since file content goes there
+    if (!inputText.trim() && !selectedFile) { 
       setError('Please enter some text or upload a file to analyze.');
       setResult(null);
       return;
     }
-    if (!inputText.trim()){ // If a file was selected but resulted in empty text
+    if (!inputText.trim()){ 
         setError('The uploaded file appears to be empty or could not be read. Please try a different file or paste text.');
         setResult(null);
         return;
