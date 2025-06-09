@@ -2,7 +2,7 @@
 'use server';
 
 /**
- * @fileOverview Generates a detailed article based on a user-provided topic using Groq API directly.
+ * @fileOverview Generates the initial sections (Abstract, Introduction, Materials & Methods) of a detailed IMRaD research article based on a user-provided topic using Groq API directly.
  *
  * - generateArticle - A function that generates an article.
  * - GenerateArticleInput - The input type for the generateArticle function.
@@ -13,32 +13,47 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const GenerateArticleInputSchema = z.object({
-  user_topic: z.string().describe('The topic for the article.'),
-  tone: z.enum(['Academic', 'Blog', 'Creative']).default('Blog').describe('The tone of the article.'),
+  user_topic: z.string().describe('The topic for the research article.'),
+  tone: z.enum(['Academic', 'Blog', 'Creative']).default('Academic').describe('The tone of the article.'),
   format: z.enum(['Plain Text', 'Markdown', 'PDF']).default('Markdown').describe('The output format for the article (influences link formatting).'),
 });
 export type GenerateArticleInput = z.infer<typeof GenerateArticleInputSchema>;
 
 const GenerateArticleOutputSchema = z.object({
-  articleContent: z.string().describe('The generated article content, including in-text links. This version does NOT include a final "References" section.'),
+  articleContent: z.string().describe('The generated initial part of the research article (Abstract, Introduction, Materials & Methods) including in-text citations and a preliminary Vancouver-style reference list for content generated so far. This version does NOT include the final consolidated "References" section for the whole paper.'),
 });
 export type GenerateArticleOutput = z.infer<typeof GenerateArticleOutputSchema>;
 
-const articlePromptTemplate = `You are an expert research writer. Your task is to generate a comprehensive and highly detailed article of AT LEAST 4000 words, strictly focused on the topic: "{{user_topic}}".
+const articlePromptTemplate = `You are an expert research scientist and academic writer. Your task is to generate the initial ~4000 words of a comprehensive and highly detailed IMRaD (Introduction, Materials and Methods, Results, Discussion) research article strictly focused on the topic: "{{user_topic}}".
 
-The introduction should be substantial, providing a thorough overview of the topic before proceeding to the main body.
+This initial part MUST contain:
+1.  A detailed Abstract (approx. 250-300 words) summarizing the study's background, objectives, methods, key (hypothetical) findings, and conclusions.
+2.  A comprehensive Introduction section (approx. 1000-1500 words) providing background, literature review, problem statement, study rationale, and clear objectives/hypotheses.
+3.  A very detailed Materials and Methods section (approx. 2000-2500 words) describing the (hypothetical) experimental design, study population/sample, data collection procedures, variables measured, ethical considerations, and statistical analysis plan. This section needs to be thorough enough for replication.
 
-Follow these instructions carefully:
-1.  **Content Focus**: The entire article must be dedicated to the specified "{{user_topic}}". Do not deviate to other topics.
-2.  **Structure**: Organize the article logically into sections and subsections using H2 and H3 headings as appropriate for the "{{format}}" output. Each section must provide thorough, well-explained content on its specific sub-topic.
-3.  **In-text Links**: After every major section of the article, you MUST include 1-2 real, relevant links from reputable sources (e.g., Wikipedia, Forbes, Scientific American, Harvard.edu, etc.). These links should be directly related to the content of that section and formatted as clickable links appropriate for the "{{format}}".
-4.  **Tone**: Maintain a "{{tone}}" tone throughout the article.
-5.  **Output Format**: The article content should be suitable for "{{format}}".
-6.  **NO FINAL REFERENCES SECTION**: Your output for 'articleContent' should ONLY be the body of the article with its in-text links. Do NOT add a "References" section at the end of this part. Another process will handle the final consolidated references.
+The study should be presented as a real lab-based or clinical experimental study conducted between 2023-2025. For example, if the topic is "AI in Dental Caries", it might evaluate the "Development and Validation of an AI-Based Diagnostic Tool for Early Detection of Dental Caries Using Intraoral Radiographs". Adapt this hypothetical study nature to the "{{user_topic}}".
 
-The generated 'articleContent' must contain the article body and its in-text links as described.
+Structure:
+- Use H2 for main sections (e.g., ## Abstract, ## Introduction, ## Materials and Methods).
+- Use H3 for subsections within Materials and Methods as appropriate (e.g., ### Study Design, ### Participants, ### Data Collection, ### Statistical Analysis).
 
-IMPORTANT: Your entire response MUST be a valid JSON object that conforms to the GenerateArticleOutputSchema (i.e., {"articleContent": "your generated article text..."}). Do not include any other text, prefixes, explanations, or conversational remarks outside of this JSON object.`;
+Referencing and Citations:
+- You MUST include at least 5-7 real, relevant references from 2000-2025 for this initial part, formatted in Vancouver style. Include PMID or DOI for each where available.
+- In-text citations MUST be in square brackets, e.g., [1], [2,3]. Number references chronologically based on their first appearance.
+- At the end of the generated content for this part, include a preliminary "References" list (e.g., ## Preliminary References) containing ONLY the references cited in THIS initial segment, formatted in Vancouver style and numbered.
+
+Quality and Tone:
+- Maintain strict scientific accuracy, originality, and a formal "{{tone}}" (which should be Academic for this task).
+- Avoid plagiarism and generic AI-generated summaries.
+- This must be an original research article. Reflect updated research insights and ensure technical rigor directly relevant to the study's title and aims based on "{{user_topic}}".
+
+Output Format:
+- The article content should be formatted for "{{format}}".
+- Ensure your entire response is a valid JSON object conforming to GenerateArticleOutputSchema.
+
+The generated 'articleContent' must contain these specified sections and adhere to all instructions. Do NOT add Results, Discussion, or Conclusion sections in this part.
+
+IMPORTANT: Your entire response MUST be a valid JSON object that conforms to the GenerateArticleOutputSchema (i.e., {"articleContent": "your generated Abstract, Introduction, Materials & Methods, and preliminary references..."}). Do not include any other text, prefixes, explanations, or conversational remarks outside of this JSON object.`;
 
 const systemMessageContent = "You are an AI assistant that strictly follows user instructions. The user will provide a detailed prompt instructing you to generate specific content AND to format your entire response as a single, valid JSON object. Your sole task is to generate this JSON object exactly as described in the user's prompt, conforming to any specified schemas. Do not add any explanatory text, apologies, or conversational remarks before or after the JSON object. Your entire output must be only the JSON object itself.";
 
@@ -52,7 +67,7 @@ async function callGroqAPI(input: GenerateArticleInput): Promise<GenerateArticle
   for (const key in input) {
     if (Object.prototype.hasOwnProperty.call(input, key)) {
       const value = (input as any)[key];
-      userMessageContent = userMessageContent.replace(new RegExp(`{{{${key}}}}`, 'g'), String(value)); 
+      userMessageContent = userMessageContent.replace(new RegExp(`{{{${key}}}}`, 'g'), String(value));
       userMessageContent = userMessageContent.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
     }
   }
@@ -112,6 +127,8 @@ const generateArticleFlow = ai.defineFlow(
     outputSchema: GenerateArticleOutputSchema,
   },
   async (input) => {
-    return callGroqAPI(input);
+    // Force Academic tone for IMRaD structure
+    const academicInput = { ...input, tone: 'Academic' as const };
+    return callGroqAPI(academicInput);
   }
 );
