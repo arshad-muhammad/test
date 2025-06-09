@@ -41,7 +41,7 @@ Here is the initial article content you need to extend:
 1.  Review the 'initialArticleContent' provided above.
 2.  Generate approximately 2000-3000 additional words of NEW, relevant content. This new content MUST strictly stay on the original topic: "{{userTopic}}" and maintain the "{{tone}}" tone.
 3.  DO NOT repeat information already present in the 'initialArticleContent'. Focus on adding new depth, exploring new sub-topics, or providing further details on aspects briefly mentioned.
-4.  Organize your new, additional content logically into sections and subsections using H2 and H3 headings as appropriate for the "{{format}}" output.
+4.  Organize your new, additional content logically into sections and subsections using H2 and H3 headings as appropriate for the "{{format}}" output. Each new section must provide thorough, well-explained content, adding new depth or exploring new sub-topics related to '{{userTopic}}'.
 5.  After every major new section you add, you MUST include 1-2 real, relevant links from reputable sources (e.g., Wikipedia, Forbes, Scientific American, Harvard.edu, etc.). These links should be directly related to the content of that new section and formatted as clickable links appropriate for the "{{format}}".
 6.  Let's call the content generated in this Part 1 "extendedContent".
 

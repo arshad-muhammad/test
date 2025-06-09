@@ -30,7 +30,7 @@ The introduction should be substantial, providing a thorough overview of the top
 
 Follow these instructions carefully:
 1.  **Content Focus**: The entire article must be dedicated to the specified "{{user_topic}}". Do not deviate to other topics.
-2.  **Structure**: Organize the article logically into sections and subsections using H2 and H3 headings as appropriate for the "{{format}}" output.
+2.  **Structure**: Organize the article logically into sections and subsections using H2 and H3 headings as appropriate for the "{{format}}" output. Each section must provide thorough, well-explained content on its specific sub-topic.
 3.  **In-text Links**: After every major section of the article, you MUST include 1-2 real, relevant links from reputable sources (e.g., Wikipedia, Forbes, Scientific American, Harvard.edu, etc.). These links should be directly related to the content of that section and formatted as clickable links appropriate for the "{{format}}".
 4.  **Tone**: Maintain a "{{tone}}" tone throughout the article.
 5.  **Output Format**: The article content should be suitable for "{{format}}".
