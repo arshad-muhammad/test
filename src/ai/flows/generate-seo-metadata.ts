@@ -76,7 +76,8 @@ async function callGroqAPI(input: GenerateSeoMetadataInput): Promise<GenerateSeo
         { role: "user", content: userMessageContent }
       ],
       temperature: 0.7,
-      stream: false
+      stream: false,
+      response_format: { type: "json_object" } 
     })
   });
 
@@ -93,6 +94,8 @@ async function callGroqAPI(input: GenerateSeoMetadataInput): Promise<GenerateSeo
   }
 
   try {
+    // The rawOutput from Groq (when response_format is json_object) should already be a string representation of a JSON object.
+    // So, we parse it directly.
     const parsedOutput = JSON.parse(rawOutput);
     const validationResult = GenerateSeoMetadataOutputSchema.safeParse(parsedOutput);
     if (!validationResult.success) {
@@ -101,6 +104,9 @@ async function callGroqAPI(input: GenerateSeoMetadataInput): Promise<GenerateSeo
     }
     return validationResult.data;
   } catch (e) {
+    // If JSON.parse fails, it means the model didn't adhere to the JSON output format despite response_format.
+    // Log the raw output for debugging.
+    console.error("Failed to parse Groq API JSON output. Raw output:", rawOutput);
     throw new Error(`Failed to parse or validate Groq API JSON output: ${(e as Error).message}. Raw output: ${rawOutput}`);
   }
 }

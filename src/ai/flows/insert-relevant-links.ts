@@ -9,7 +9,7 @@
  * - InsertRelevantLinksOutput - The return type for the insertRelevantLinks function.
  */
 
-import {ai} from '@/ai/genkit';
+import {ai}from '@/ai/genkit';
 import {z} from 'genkit';
 
 const InsertRelevantLinksInputSchema = z.object({
@@ -58,7 +58,8 @@ async function callGroqAPI(input: InsertRelevantLinksInput): Promise<InsertRelev
         { role: "user", content: userMessageContent }
       ],
       temperature: 0.7,
-      stream: false
+      stream: false,
+      response_format: { type: "json_object" } 
     })
   });
 
@@ -75,6 +76,8 @@ async function callGroqAPI(input: InsertRelevantLinksInput): Promise<InsertRelev
   }
 
   try {
+    // The rawOutput from Groq (when response_format is json_object) should already be a string representation of a JSON object.
+    // So, we parse it directly.
     const parsedOutput = JSON.parse(rawOutput);
     const validationResult = InsertRelevantLinksOutputSchema.safeParse(parsedOutput);
     if (!validationResult.success) {
@@ -83,6 +86,9 @@ async function callGroqAPI(input: InsertRelevantLinksInput): Promise<InsertRelev
     }
     return validationResult.data;
   } catch (e) {
+    // If JSON.parse fails, it means the model didn't adhere to the JSON output format despite response_format.
+    // Log the raw output for debugging.
+    console.error("Failed to parse Groq API JSON output. Raw output:", rawOutput);
     throw new Error(`Failed to parse or validate Groq API JSON output: ${(e as Error).message}. Raw output: ${rawOutput}`);
   }
 }

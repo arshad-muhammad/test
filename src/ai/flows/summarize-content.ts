@@ -64,7 +64,8 @@ async function callGroqAPI(input: SummarizeContentInput): Promise<SummarizeConte
         { role: "user", content: userMessageContent }
       ],
       temperature: 0.7,
-      stream: false
+      stream: false,
+      response_format: { type: "json_object" } 
     })
   });
 
@@ -81,6 +82,8 @@ async function callGroqAPI(input: SummarizeContentInput): Promise<SummarizeConte
   }
 
   try {
+    // The rawOutput from Groq (when response_format is json_object) should already be a string representation of a JSON object.
+    // So, we parse it directly.
     const parsedOutput = JSON.parse(rawOutput);
     // Validate against the schema for LLM's direct output
     const validationResult = SummarizeContentLLMOutputSchema.safeParse(parsedOutput);
@@ -94,6 +97,9 @@ async function callGroqAPI(input: SummarizeContentInput): Promise<SummarizeConte
       progress: 'Content summarization complete.'
     };
   } catch (e) {
+    // If JSON.parse fails, it means the model didn't adhere to the JSON output format despite response_format.
+    // Log the raw output for debugging.
+    console.error("Failed to parse Groq API JSON output. Raw output:", rawOutput);
     throw new Error(`Failed to parse or validate Groq API JSON output: ${(e as Error).message}. Raw output: ${rawOutput}`);
   }
 }
