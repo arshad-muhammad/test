@@ -1,7 +1,7 @@
 
 'use server';
 /**
- * @fileOverview Extends an initial article, adds more content, and then generates a final "References" section for the combined content.
+ * @fileOverview Extends an initial article, adds more content, and then generates a final "References" section for the combined content using Groq API directly.
  *
  * - extendAndFinalizeArticle - A function that extends an article and adds final references.
  * - ExtendAndFinalizeArticleInput - The input type for this function.
@@ -24,15 +24,7 @@ const ExtendAndFinalizeArticleOutputSchema = z.object({
 });
 export type ExtendAndFinalizeArticleOutput = z.infer<typeof ExtendAndFinalizeArticleOutputSchema>;
 
-export async function extendAndFinalizeArticle(input: ExtendAndFinalizeArticleInput): Promise<ExtendAndFinalizeArticleOutput> {
-  return extendAndFinalizeArticleFlow(input);
-}
-
-const prompt = ai.definePrompt({
-  name: 'extendAndFinalizeArticlePrompt',
-  input: {schema: ExtendAndFinalizeArticleInputSchema},
-  output: {schema: ExtendAndFinalizeArticleOutputSchema},
-  prompt: `You are an expert research writer and editor. You will perform a multi-step task:
+const promptTemplate = `You are an expert research writer and editor. You will perform a multi-step task:
 First, you will extend an existing article draft.
 Second, you will create a consolidated and exhaustive "References" section for the complete, combined article.
 
@@ -55,12 +47,12 @@ Here is the initial article content you need to extend:
 
 **Part 2: Combine and Create Exhaustive References Section**
 1.  Take the 'initialArticleContent' and append your newly generated 'extendedContent' to it. This forms the "completeArticleBody".
-2.  Now, for this "completeArticleBody", create an exhaustive "References" section that will be placed at the VERY END. This section should be as comprehensive as possible, listing as many relevant references as you can find.
+2.  Now, for this "completeArticleBody", create an EXTREMELY EXHAUSTIVE "References" section that will be placed at the VERY END. This section should be as comprehensive as humanly possible, listing as many relevant references as you can find.
 3.  The "References" section must follow these rules:
     a.  **Heading**: Start with a heading. If format is Markdown, use "## References". If format is "Plain Text", use "References:".
     b.  **Extract and List All Linked URLs**: Identify and extract ALL unique URLs that are embedded as in-text links throughout the "completeArticleBody" (both initial and extended parts). List each unique URL. Each URL should be on a new line. Format them as clickable links if the "{{format}}" supports it.
     c.  **Identify Key Authors and Publications from Links**: For each extracted URL or group of related URLs, if identifiable from the URL or common knowledge, briefly mention the names of key authors or organizations associated with that source. If specific publication titles related to the URL are known, mention them.
-    d.  **Identify Key Individuals, Their Publications, and Contributions (Broader Scope)**: Beyond the direct links, use your extensive knowledge of the topic "{{userTopic}}" to identify and list the most important individuals ("most peoples who worked in this particular topic") who have worked on or published significant material related to this topic. For each individual, list their key publications (including specific titles if known) or contributions, even if these specific works were not directly linked in the article body. Explain their significance and relevance to the topic "{{userTopic}}". Aim to cover a broad range of influential figures and their works.
+    d.  **Identify Key Individuals, Their Publications, and Contributions (Broader Scope)**: Beyond the direct links, use your extensive knowledge of the topic "{{userTopic}}" to identify and list the most important individuals ("most peoples who worked in this particular topic") who have worked on or published significant material related to this topic. For each individual, list their key publications (including specific titles of books, articles, research papers, etc.) or contributions, even if these specific works were not directly linked in the article body. Explain their significance and relevance to the topic "{{userTopic}}". Aim to cover a very broad range of influential figures and their complete known relevant works.
     e.  **Structure**: Organize this information clearly. You might group by individual, by linked source, or by publication type, then expand with related publications and author details. Ensure the section is well-structured and easy to read.
 
 Your final output for 'finalFullArticle' must be a single string containing:
@@ -70,8 +62,72 @@ extendedContent
 (seamlessly followed by)
 The_Generated_References_Section
 
-Ensure the entire output adheres to the "{{format}}" and "{{tone}}".`,
-});
+Ensure the entire output adheres to the "{{format}}" and "{{tone}}".
+
+IMPORTANT: Your entire response MUST be a valid JSON object that conforms to the ExtendAndFinalizeArticleOutputSchema (i.e., {"finalFullArticle": "your complete article string..."}). Do not include any other text, prefixes, explanations, or conversational remarks outside of this JSON object.`;
+
+const systemMessageContent = "You are a world-class expert researcher and technical writer. Your job is to generate well-structured, deeply researched, SEO-friendly, long-form content on any topic the user gives. Rules: - Start with a strong introduction. - Use H2 and H3 headers to divide content into sections and subsections. - Support claims with facts and examples. - Write in a human-friendly, natural tone. - Include real-world applications, historical background, current trends, and future predictions. - Mention relevant technologies, events, or studies. - Use markdown formatting with clear structure. Only return the content. Do not say “Sure, here is...” or “Here's the article.” Output should be directly usable in a blog or document.";
+
+async function callGroqAPI(input: ExtendAndFinalizeArticleInput): Promise<ExtendAndFinalizeArticleOutput> {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
+    throw new Error("GROQ_API_KEY is not set in environment variables.");
+  }
+
+  let userMessageContent = promptTemplate;
+  for (const key in input) {
+    if (Object.prototype.hasOwnProperty.call(input, key)) {
+      const value = (input as any)[key];
+      userMessageContent = userMessageContent.replace(new RegExp(`{{{${key}}}}`, 'g'), String(value));
+      userMessageContent = userMessageContent.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
+    }
+  }
+
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: "llama3-70b-8192",
+      messages: [
+        { role: "system", content: systemMessageContent },
+        { role: "user", content: userMessageContent }
+      ],
+      temperature: 0.7,
+      stream: false
+    })
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`Groq API request failed with status ${response.status}: ${errorBody}`);
+  }
+
+  const data = await response.json();
+  const rawOutput = data.choices[0]?.message?.content;
+
+  if (typeof rawOutput !== 'string') {
+    throw new Error("Groq API response did not contain expected string content.");
+  }
+
+  try {
+    const parsedOutput = JSON.parse(rawOutput);
+    const validationResult = ExtendAndFinalizeArticleOutputSchema.safeParse(parsedOutput);
+    if (!validationResult.success) {
+      console.error("Groq output validation error details:", validationResult.error.errors);
+      throw new Error(`Groq API output validation failed: ${validationResult.error.message}. Raw: ${rawOutput}`);
+    }
+    return validationResult.data;
+  } catch (e) {
+    throw new Error(`Failed to parse or validate Groq API JSON output: ${(e as Error).message}. Raw output: ${rawOutput}`);
+  }
+}
+
+export async function extendAndFinalizeArticle(input: ExtendAndFinalizeArticleInput): Promise<ExtendAndFinalizeArticleOutput> {
+  return extendAndFinalizeArticleFlow(input);
+}
 
 const extendAndFinalizeArticleFlow = ai.defineFlow(
   {
@@ -79,8 +135,7 @@ const extendAndFinalizeArticleFlow = ai.defineFlow(
     inputSchema: ExtendAndFinalizeArticleInputSchema,
     outputSchema: ExtendAndFinalizeArticleOutputSchema,
   },
-  async input => {
-    const {output} = await prompt(input);
-    return output!;
+  async (input) => {
+    return callGroqAPI(input);
   }
 );

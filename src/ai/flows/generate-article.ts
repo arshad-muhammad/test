@@ -1,9 +1,8 @@
 
-// src/ai/flows/generate-article.ts
 'use server';
 
 /**
- * @fileOverview Generates a detailed article based on a user-provided topic.
+ * @fileOverview Generates a detailed article based on a user-provided topic using Groq API directly.
  *
  * - generateArticle - A function that generates an article.
  * - GenerateArticleInput - The input type for the generateArticle function.
@@ -25,15 +24,10 @@ const GenerateArticleOutputSchema = z.object({
 });
 export type GenerateArticleOutput = z.infer<typeof GenerateArticleOutputSchema>;
 
-export async function generateArticle(input: GenerateArticleInput): Promise<GenerateArticleOutput> {
-  return generateArticleFlow(input);
-}
+// This is the original prompt template.
+const articlePromptTemplate = `You are an expert research writer. Your task is to generate a comprehensive and highly detailed article of AT LEAST 4000 words, strictly focused on the topic: "{{user_topic}}".
 
-const prompt = ai.definePrompt({
-  name: 'generateArticlePrompt',
-  input: {schema: GenerateArticleInputSchema},
-  output: {schema: GenerateArticleOutputSchema},
-  prompt: `You are an expert research writer. Your task is to generate a comprehensive and highly detailed article of AT LEAST 4000 words, strictly focused on the topic: "{{user_topic}}".
+The introduction should be substantial, providing a thorough overview of the topic before proceeding to the main body.
 
 Follow these instructions carefully:
 1.  **Content Focus**: The entire article must be dedicated to the specified "{{user_topic}}". Do not deviate to other topics.
@@ -43,8 +37,72 @@ Follow these instructions carefully:
 5.  **Output Format**: The article content should be suitable for "{{format}}".
 6.  **NO FINAL REFERENCES SECTION**: Your output for 'articleContent' should ONLY be the body of the article with its in-text links. Do NOT add a "References" section at the end of this part. Another process will handle the final consolidated references.
 
-The generated 'articleContent' must contain the article body and its in-text links as described.`,
-});
+The generated 'articleContent' must contain the article body and its in-text links as described.
+
+IMPORTANT: Your entire response MUST be a valid JSON object that conforms to the GenerateArticleOutputSchema (i.e., {"articleContent": "your generated article text..."}). Do not include any other text, prefixes, explanations, or conversational remarks outside of this JSON object.`;
+
+const systemMessageContent = "You are a world-class expert researcher and technical writer. Your job is to generate well-structured, deeply researched, SEO-friendly, long-form content on any topic the user gives. Rules: - Start with a strong introduction. - Use H2 and H3 headers to divide content into sections and subsections. - Support claims with facts and examples. - Write in a human-friendly, natural tone. - Include real-world applications, historical background, current trends, and future predictions. - Mention relevant technologies, events, or studies. - Use markdown formatting with clear structure. Only return the content. Do not say “Sure, here is...” or “Here's the article.” Output should be directly usable in a blog or document.";
+
+async function callGroqAPI(input: GenerateArticleInput): Promise<GenerateArticleOutput> {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
+    throw new Error("GROQ_API_KEY is not set in environment variables.");
+  }
+
+  let userMessageContent = articlePromptTemplate;
+  for (const key in input) {
+    if (Object.prototype.hasOwnProperty.call(input, key)) {
+      const value = (input as any)[key];
+      userMessageContent = userMessageContent.replace(new RegExp(`{{{${key}}}}`, 'g'), String(value)); // Handle triple-stash first
+      userMessageContent = userMessageContent.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
+    }
+  }
+
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: "llama3-70b-8192",
+      messages: [
+        { role: "system", content: systemMessageContent },
+        { role: "user", content: userMessageContent }
+      ],
+      temperature: 0.7,
+      stream: false
+    })
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`Groq API request failed with status ${response.status}: ${errorBody}`);
+  }
+
+  const data = await response.json();
+  const rawOutput = data.choices[0]?.message?.content;
+
+  if (typeof rawOutput !== 'string') {
+    throw new Error("Groq API response did not contain expected string content.");
+  }
+
+  try {
+    const parsedOutput = JSON.parse(rawOutput);
+    const validationResult = GenerateArticleOutputSchema.safeParse(parsedOutput);
+    if (!validationResult.success) {
+      console.error("Groq output validation error details:", validationResult.error.errors);
+      throw new Error(`Groq API output validation failed: ${validationResult.error.message}. Raw: ${rawOutput}`);
+    }
+    return validationResult.data;
+  } catch (e) {
+    throw new Error(`Failed to parse or validate Groq API JSON output: ${(e as Error).message}. Raw output: ${rawOutput}`);
+  }
+}
+
+export async function generateArticle(input: GenerateArticleInput): Promise<GenerateArticleOutput> {
+  return generateArticleFlow(input);
+}
 
 const generateArticleFlow = ai.defineFlow(
   {
@@ -52,8 +110,7 @@ const generateArticleFlow = ai.defineFlow(
     inputSchema: GenerateArticleInputSchema,
     outputSchema: GenerateArticleOutputSchema,
   },
-  async input => {
-    const {output} = await prompt(input);
-    return output!;
+  async (input) => {
+    return callGroqAPI(input);
   }
 );

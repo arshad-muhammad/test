@@ -1,7 +1,13 @@
+
 import {genkit} from 'genkit';
-import {googleAI} from '@genkit-ai/googleai';
+import { config } from 'dotenv';
+
+config(); // Ensure environment variables are loaded
 
 export const ai = genkit({
-  plugins: [googleAI()],
-  model: 'googleai/gemini-2.0-flash',
+  plugins: [
+    // Removed Groq plugin as it's not a public package and API will be called directly.
+  ],
+  // Removed model: 'llama3-70b-8192' as direct API calls will specify the model.
+  // If other Genkit operations require a default model, configure appropriate plugins (e.g., googleAI).
 });
