@@ -46,7 +46,7 @@ The meta description should be 150-160 characters.
 
 IMPORTANT: Your entire response MUST be a valid JSON object that conforms to the GenerateSeoMetadataOutputSchema (i.e., {"seoTitle": "your title", "metaDescription": "your description"}). Do not include any other text, prefixes, explanations, or conversational remarks outside of this JSON object.`;
 
-const systemMessageContent = "You are an AI assistant specialized in SEO and content optimization. Provide concise and accurate metadata.";
+const systemMessageContent = "You are an AI assistant that strictly follows user instructions. The user will provide a detailed prompt instructing you to generate specific content AND to format your entire response as a single, valid JSON object. Your sole task is to generate this JSON object exactly as described in the user's prompt, conforming to any specified schemas. Do not add any explanatory text, apologies, or conversational remarks before or after the JSON object. Your entire output must be only the JSON object itself.";
 
 async function callGroqAPI(input: GenerateSeoMetadataInput): Promise<GenerateSeoMetadataOutput> {
   const apiKey = process.env.GROQ_API_KEY;
@@ -62,7 +62,7 @@ async function callGroqAPI(input: GenerateSeoMetadataInput): Promise<GenerateSeo
       userMessageContent = userMessageContent.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
     }
   }
-  
+
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -77,7 +77,7 @@ async function callGroqAPI(input: GenerateSeoMetadataInput): Promise<GenerateSeo
       ],
       temperature: 0.7,
       stream: false,
-      response_format: { type: "json_object" } 
+      response_format: { type: "json_object" }
     })
   });
 
@@ -94,8 +94,6 @@ async function callGroqAPI(input: GenerateSeoMetadataInput): Promise<GenerateSeo
   }
 
   try {
-    // The rawOutput from Groq (when response_format is json_object) should already be a string representation of a JSON object.
-    // So, we parse it directly.
     const parsedOutput = JSON.parse(rawOutput);
     const validationResult = GenerateSeoMetadataOutputSchema.safeParse(parsedOutput);
     if (!validationResult.success) {
@@ -104,8 +102,6 @@ async function callGroqAPI(input: GenerateSeoMetadataInput): Promise<GenerateSeo
     }
     return validationResult.data;
   } catch (e) {
-    // If JSON.parse fails, it means the model didn't adhere to the JSON output format despite response_format.
-    // Log the raw output for debugging.
     console.error("Failed to parse Groq API JSON output. Raw output:", rawOutput);
     throw new Error(`Failed to parse or validate Groq API JSON output: ${(e as Error).message}. Raw output: ${rawOutput}`);
   }

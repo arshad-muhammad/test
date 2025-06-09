@@ -28,7 +28,7 @@ Article Section: {{{articleSection}}}
 
 IMPORTANT: Your entire response MUST be a valid JSON object that conforms to the InsertRelevantLinksOutputSchema (i.e., {"sectionWithLinks": "The section text with links appended..."}). Do not include any other text, prefixes, explanations, or conversational remarks outside of this JSON object.`;
 
-const systemMessageContent = "You are an AI assistant specialized in identifying and inserting relevant contextual links into text content.";
+const systemMessageContent = "You are an AI assistant that strictly follows user instructions. The user will provide a detailed prompt instructing you to generate specific content AND to format your entire response as a single, valid JSON object. Your sole task is to generate this JSON object exactly as described in the user's prompt, conforming to any specified schemas. Do not add any explanatory text, apologies, or conversational remarks before or after the JSON object. Your entire output must be only the JSON object itself.";
 
 async function callGroqAPI(input: InsertRelevantLinksInput): Promise<InsertRelevantLinksOutput> {
   const apiKey = process.env.GROQ_API_KEY;
@@ -44,7 +44,7 @@ async function callGroqAPI(input: InsertRelevantLinksInput): Promise<InsertRelev
       userMessageContent = userMessageContent.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
     }
   }
-  
+
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -52,14 +52,14 @@ async function callGroqAPI(input: InsertRelevantLinksInput): Promise<InsertRelev
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      model: "llama3-70b-8192", 
+      model: "llama3-70b-8192",
       messages: [
         { role: "system", content: systemMessageContent },
         { role: "user", content: userMessageContent }
       ],
       temperature: 0.7,
       stream: false,
-      response_format: { type: "json_object" } 
+      response_format: { type: "json_object" }
     })
   });
 
@@ -76,8 +76,6 @@ async function callGroqAPI(input: InsertRelevantLinksInput): Promise<InsertRelev
   }
 
   try {
-    // The rawOutput from Groq (when response_format is json_object) should already be a string representation of a JSON object.
-    // So, we parse it directly.
     const parsedOutput = JSON.parse(rawOutput);
     const validationResult = InsertRelevantLinksOutputSchema.safeParse(parsedOutput);
     if (!validationResult.success) {
@@ -86,8 +84,6 @@ async function callGroqAPI(input: InsertRelevantLinksInput): Promise<InsertRelev
     }
     return validationResult.data;
   } catch (e) {
-    // If JSON.parse fails, it means the model didn't adhere to the JSON output format despite response_format.
-    // Log the raw output for debugging.
     console.error("Failed to parse Groq API JSON output. Raw output:", rawOutput);
     throw new Error(`Failed to parse or validate Groq API JSON output: ${(e as Error).message}. Raw output: ${rawOutput}`);
   }

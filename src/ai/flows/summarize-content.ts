@@ -17,7 +17,6 @@ const SummarizeContentInputSchema = z.object({
 });
 export type SummarizeContentInput = z.infer<typeof SummarizeContentInputSchema>;
 
-// The LLM will only be asked to produce the 'summary'. 'progress' is added manually.
 const SummarizeContentLLMOutputSchema = z.object({
   summary: z.string().describe('A 500-word summary of the content.'),
 });
@@ -34,7 +33,7 @@ const promptTemplate = `You are an expert summarizer. Summarize the following co
 
 IMPORTANT: Your entire response MUST be a valid JSON object that conforms to the schema {"summary": "your 500-word summary"}. Do not include any other text, prefixes, explanations, or conversational remarks outside of this JSON object.`;
 
-const systemMessageContent = "You are an AI assistant specialized in text summarization. Provide concise and accurate summaries.";
+const systemMessageContent = "You are an AI assistant that strictly follows user instructions. The user will provide a detailed prompt instructing you to generate specific content AND to format your entire response as a single, valid JSON object. Your sole task is to generate this JSON object exactly as described in the user's prompt, conforming to any specified schemas. Do not add any explanatory text, apologies, or conversational remarks before or after the JSON object. Your entire output must be only the JSON object itself.";
 
 async function callGroqAPI(input: SummarizeContentInput): Promise<SummarizeContentOutput> {
   const apiKey = process.env.GROQ_API_KEY;
@@ -50,7 +49,7 @@ async function callGroqAPI(input: SummarizeContentInput): Promise<SummarizeConte
       userMessageContent = userMessageContent.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
     }
   }
-  
+
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -65,7 +64,7 @@ async function callGroqAPI(input: SummarizeContentInput): Promise<SummarizeConte
       ],
       temperature: 0.7,
       stream: false,
-      response_format: { type: "json_object" } 
+      response_format: { type: "json_object" }
     })
   });
 
@@ -82,23 +81,17 @@ async function callGroqAPI(input: SummarizeContentInput): Promise<SummarizeConte
   }
 
   try {
-    // The rawOutput from Groq (when response_format is json_object) should already be a string representation of a JSON object.
-    // So, we parse it directly.
     const parsedOutput = JSON.parse(rawOutput);
-    // Validate against the schema for LLM's direct output
     const validationResult = SummarizeContentLLMOutputSchema.safeParse(parsedOutput);
     if (!validationResult.success) {
       console.error("Groq output validation error details:", validationResult.error.errors);
       throw new Error(`Groq API output validation failed: ${validationResult.error.message}. Raw: ${rawOutput}`);
     }
-    // Add the progress field before returning the final output schema
     return {
       summary: validationResult.data.summary,
       progress: 'Content summarization complete.'
     };
   } catch (e) {
-    // If JSON.parse fails, it means the model didn't adhere to the JSON output format despite response_format.
-    // Log the raw output for debugging.
     console.error("Failed to parse Groq API JSON output. Raw output:", rawOutput);
     throw new Error(`Failed to parse or validate Groq API JSON output: ${(e as Error).message}. Raw output: ${rawOutput}`);
   }
@@ -112,7 +105,7 @@ const summarizeContentFlow = ai.defineFlow(
   {
     name: 'summarizeContentFlow',
     inputSchema: SummarizeContentInputSchema,
-    outputSchema: SummarizeContentOutputSchema, // This flow returns the full output schema including progress
+    outputSchema: SummarizeContentOutputSchema,
   },
   async (input) => {
     return callGroqAPI(input);

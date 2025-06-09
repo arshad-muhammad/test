@@ -24,7 +24,6 @@ const GenerateArticleOutputSchema = z.object({
 });
 export type GenerateArticleOutput = z.infer<typeof GenerateArticleOutputSchema>;
 
-// This is the original prompt template.
 const articlePromptTemplate = `You are an expert research writer. Your task is to generate a comprehensive and highly detailed article of AT LEAST 4000 words, strictly focused on the topic: "{{user_topic}}".
 
 The introduction should be substantial, providing a thorough overview of the topic before proceeding to the main body.
@@ -41,7 +40,7 @@ The generated 'articleContent' must contain the article body and its in-text lin
 
 IMPORTANT: Your entire response MUST be a valid JSON object that conforms to the GenerateArticleOutputSchema (i.e., {"articleContent": "your generated article text..."}). Do not include any other text, prefixes, explanations, or conversational remarks outside of this JSON object.`;
 
-const systemMessageContent = "You are a world-class expert researcher and technical writer. Your job is to generate well-structured, deeply researched, SEO-friendly, long-form content on any topic the user gives. Rules: - Start with a strong introduction. - Use H2 and H3 headers to divide content into sections and subsections. - Support claims with facts and examples. - Write in a human-friendly, natural tone. - Include real-world applications, historical background, current trends, and future predictions. - Mention relevant technologies, events, or studies. - Use markdown formatting with clear structure. Only return the content. Do not say “Sure, here is...” or “Here's the article.” Output should be directly usable in a blog or document.";
+const systemMessageContent = "You are an AI assistant that strictly follows user instructions. The user will provide a detailed prompt instructing you to generate specific content AND to format your entire response as a single, valid JSON object. Your sole task is to generate this JSON object exactly as described in the user's prompt, conforming to any specified schemas. Do not add any explanatory text, apologies, or conversational remarks before or after the JSON object. Your entire output must be only the JSON object itself.";
 
 async function callGroqAPI(input: GenerateArticleInput): Promise<GenerateArticleOutput> {
   const apiKey = process.env.GROQ_API_KEY;
@@ -53,7 +52,7 @@ async function callGroqAPI(input: GenerateArticleInput): Promise<GenerateArticle
   for (const key in input) {
     if (Object.prototype.hasOwnProperty.call(input, key)) {
       const value = (input as any)[key];
-      userMessageContent = userMessageContent.replace(new RegExp(`{{{${key}}}}`, 'g'), String(value)); // Handle triple-stash first
+      userMessageContent = userMessageContent.replace(new RegExp(`{{{${key}}}}`, 'g'), String(value)); 
       userMessageContent = userMessageContent.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
     }
   }
@@ -72,7 +71,7 @@ async function callGroqAPI(input: GenerateArticleInput): Promise<GenerateArticle
       ],
       temperature: 0.7,
       stream: false,
-      response_format: { type: "json_object" } 
+      response_format: { type: "json_object" }
     })
   });
 
@@ -89,8 +88,6 @@ async function callGroqAPI(input: GenerateArticleInput): Promise<GenerateArticle
   }
 
   try {
-    // The rawOutput from Groq (when response_format is json_object) should already be a string representation of a JSON object.
-    // So, we parse it directly.
     const parsedOutput = JSON.parse(rawOutput);
     const validationResult = GenerateArticleOutputSchema.safeParse(parsedOutput);
     if (!validationResult.success) {
@@ -99,8 +96,6 @@ async function callGroqAPI(input: GenerateArticleInput): Promise<GenerateArticle
     }
     return validationResult.data;
   } catch (e) {
-     // If JSON.parse fails, it means the model didn't adhere to the JSON output format despite response_format.
-    // Log the raw output for debugging.
     console.error("Failed to parse Groq API JSON output. Raw output:", rawOutput);
     throw new Error(`Failed to parse or validate Groq API JSON output: ${(e as Error).message}. Raw output: ${rawOutput}`);
   }

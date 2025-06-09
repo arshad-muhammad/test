@@ -66,7 +66,7 @@ Ensure the entire output adheres to the "{{format}}" and "{{tone}}".
 
 IMPORTANT: Your entire response MUST be a valid JSON object that conforms to the ExtendAndFinalizeArticleOutputSchema (i.e., {"finalFullArticle": "your complete article string..."}). Do not include any other text, prefixes, explanations, or conversational remarks outside of this JSON object.`;
 
-const systemMessageContent = "You are a world-class expert researcher and technical writer. Your job is to generate well-structured, deeply researched, SEO-friendly, long-form content on any topic the user gives. Rules: - Start with a strong introduction. - Use H2 and H3 headers to divide content into sections and subsections. - Support claims with facts and examples. - Write in a human-friendly, natural tone. - Include real-world applications, historical background, current trends, and future predictions. - Mention relevant technologies, events, or studies. - Use markdown formatting with clear structure. Only return the content. Do not say “Sure, here is...” or “Here's the article.” Output should be directly usable in a blog or document.";
+const systemMessageContent = "You are an AI assistant that strictly follows user instructions. The user will provide a detailed prompt instructing you to generate specific content AND to format your entire response as a single, valid JSON object. Your sole task is to generate this JSON object exactly as described in the user's prompt, conforming to any specified schemas. Do not add any explanatory text, apologies, or conversational remarks before or after the JSON object. Your entire output must be only the JSON object itself.";
 
 async function callGroqAPI(input: ExtendAndFinalizeArticleInput): Promise<ExtendAndFinalizeArticleOutput> {
   const apiKey = process.env.GROQ_API_KEY;
@@ -97,7 +97,7 @@ async function callGroqAPI(input: ExtendAndFinalizeArticleInput): Promise<Extend
       ],
       temperature: 0.7,
       stream: false,
-      response_format: { type: "json_object" } 
+      response_format: { type: "json_object" }
     })
   });
 
@@ -114,8 +114,6 @@ async function callGroqAPI(input: ExtendAndFinalizeArticleInput): Promise<Extend
   }
 
   try {
-    // The rawOutput from Groq (when response_format is json_object) should already be a string representation of a JSON object.
-    // So, we parse it directly.
     const parsedOutput = JSON.parse(rawOutput);
     const validationResult = ExtendAndFinalizeArticleOutputSchema.safeParse(parsedOutput);
     if (!validationResult.success) {
@@ -124,8 +122,6 @@ async function callGroqAPI(input: ExtendAndFinalizeArticleInput): Promise<Extend
     }
     return validationResult.data;
   } catch (e) {
-    // If JSON.parse fails, it means the model didn't adhere to the JSON output format despite response_format.
-    // Log the raw output for debugging.
     console.error("Failed to parse Groq API JSON output. Raw output:", rawOutput);
     throw new Error(`Failed to parse or validate Groq API JSON output: ${(e as Error).message}. Raw output: ${rawOutput}`);
   }
